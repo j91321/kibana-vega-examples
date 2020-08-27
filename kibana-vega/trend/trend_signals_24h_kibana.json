@@ -1,0 +1,136 @@
+{
+  "$schema": "https://vega.github.io/schema/vega/v4.0.json",
+  "data": [
+    {
+      "name": "values",
+      "url": {
+        "index": ".siem-signals-*",
+        "body": {
+          "aggs": {
+            "time_buckets": {
+              "date_histogram": {
+                "field": "@timestamp",
+                "fixed_interval": "1h",
+                "extended_bounds": {"min": "now-48h/h", "max": "now-1h/m"}
+              }
+            }
+          },
+          "query": {
+            "bool": {
+              "must": [
+                {
+                  "range": {
+                    "@timestamp": {"gte": "now-48h/h", "lte": "now-1h/m"}
+                  }
+                }
+              ]
+            }
+          },
+          "size": 0
+        }
+      },
+      "format": {"property": "aggregations.time_buckets.buckets"},
+      "transform": [
+        {"type": "window", "ops": ["row_number"], "as": ["row_number"]},
+        {
+          "type": "formula",
+          "expr": "floor((datum.row_number-1)/24)",
+          "as": "group"
+        },
+        {
+          "type": "aggregate",
+          "groupby": ["group"],
+          "ops": ["sum"],
+          "fields": ["doc_count"],
+          "as": ["count"]
+        }
+      ]
+    },
+    {
+      "name": "results",
+      "values": [{}],
+      "transform": [
+        {"type": "formula", "expr": "data('values')[0].count", "as": "last"},
+        {"type": "formula", "expr": "data('values')[1].count", "as": "prev"},
+        {"type": "formula", "expr": "datum.last>datum.prev", "as": "up"},
+        {"type": "formula", "expr": "datum.last<datum.prev", "as": "down"},
+        {
+          "type": "formula",
+          "expr": "if(datum.last==0, if(datum.prev==0,0,-1), (datum.last-datum.prev)/datum.last)",
+          "as": "percentChange"
+        },
+        {
+          "type": "formula",
+          "expr": "if(datum.up,'🡭',if(datum.down,'🡮','🡪'))",
+          "as": "symbol"
+        }
+      ]
+    }
+  ],
+  "marks": [
+    {
+      "type": "text",
+      "from": {"data": "results"},
+      "encode": {
+        "update": {
+          "text": {"signal": "'Singals Trend 24h'"},
+          "fill": {"value": "#999999"},
+          "align": {"value": "center"},
+          "baseline": {"value": "bottom"},
+          "xc": {"signal": "width/2"},
+          "yc": {"signal": "height/3.6"},
+          "fontSize": {"value": 35}
+        }
+      }
+    },
+    {
+      "type": "text",
+      "from": {"data": "results"},
+      "encode": {
+        "update": {
+          "text": {"signal": "datum.last"},
+          "fill": {
+            "signal": "if(datum.up, '#d6563c', if(datum.down, '#65a637', '#6db7c6'))"
+          },
+          "align": {"value": "right"},
+          "baseline": {"value": "middle"},
+          "xc": {"signal": "width/2"},
+          "yc": {"signal": "height/1.7"},
+          "fontSize": {"value": 75}
+        }
+      }
+    },
+    {
+      "type": "text",
+      "from": {"data": "results"},
+      "encode": {
+        "update": {
+          "text": {"signal": "' ' + datum.symbol"},
+          "fill": {"value": "#000000"},
+          "align": {"value": "left"},
+          "baseline": {"value": "bottom"},
+          "xc": {"signal": "width/2"},
+          "yc": {"signal": "height/1.7"},
+          "fontSize": {"value": 35}
+        }
+      }
+    },
+    {
+      "type": "text",
+      "from": {"data": "results"},
+      "encode": {
+        "update": {
+          "text": {
+            "signal": "' ' + datum.prev + ' ('+ format(datum.percentChange, '+.1%') + ')'"
+          },
+          "fill": {"value": "#000000"},
+          "align": {"value": "left"},
+          "baseline": {"value": "top"},
+          "xc": {"signal": "width/2"},
+          "yc": {"signal": "height/1.7"},
+          "fontSize": {"value": 35}
+        }
+      }
+    }
+  ]
+}

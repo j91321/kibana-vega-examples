@@ -1,0 +1,181 @@
+{
+  # Schema indicates that this is Vega code
+  $schema: https://vega.github.io/schema/vega/v4.0.json
+  # All our data sources are listed in this section
+  data: [
+    {
+      name: values
+      # when url is an object, it is treated as an Elasticsearch query
+      url: {
+        index: winlogbeat-*
+        body: {
+          aggs: {
+            time_buckets: {
+              date_histogram: {
+                field: @timestamp
+                fixed_interval: 1m
+                extended_bounds: {min: "now-121m/h", max: "now-1m/m"}
+              }
+            }
+          }
+          query: {
+            bool: {
+              must: [
+                {range: {@timestamp: {gte: "now-121m/m", lte: "now-1m/m"}}}
+              ],
+              filter: [
+                { term: {threat.tactic.id: "TA0004"} }
+              ]
+            }
+          }
+          size: 0
+        }
+      }
+      # We only need a specific array of values from the response
+      format: {property: "aggregations.time_buckets.buckets"}
+      # Perform these transformations on each of the 20 values from ES
+      transform: [
+        # Add "row_number" field to each value -- 1..20
+        {
+          type: window
+          ops: ["row_number"]
+          as: ["row_number"]
+        }
+        # Break results into 2 groups, group #0 with row_number 1..10,
+        # and group #1 with row numbers being 11..20
+        {type: "formula", expr: "floor((datum.row_number-1)/60)", as: "group"}
+        # Group 20 values into an array of two elements, one for
+        # each group, and sum up the doc_count fields as "count"
+        {
+          type: aggregate
+          groupby: ["group"]
+          ops: ["sum"]
+          fields: ["doc_count"]
+          as: ["count"]
+        }
+        # At this point "values" data source should look like this:
+        # [ {group:0, count: nnn}, {group:1, count: nnn} ]
+        # Check this with F12 or Cmd+Opt+I (browser developer tools),
+        # and run this in console:
+        #   console.table(VEGA_DEBUG.view.data('values'))
+      ]
+    }
+    {
+      # Here we create an artificial dataset with just a single empty object
+      name: results
+      values: [
+        {}
+      ]
+      # we use transforms to add various dynamic values to the single object
+      transform: [
+        # from the 'values' dataset above, get the first count as "last",
+        # and the one before that as "prev" fields.
+        {type: "formula", expr: "data('values')[0].count", as: "last"}
+        {type: "formula", expr: "data('values')[1].count", as: "prev"}
+        # Set two boolean fields "up" and "down" to simplify drawing
+        {type: "formula", expr: "datum.last>datum.prev", as: "up"}
+        {type: "formula", expr: "datum.last<datum.prev", as: "down"}
+        # Calculate the change as percentage, with special handling of 0
+        {
+          type: formula
+          expr: "if(datum.last==0, if(datum.prev==0,0,-1), (datum.last-datum.prev)/datum.last)"
+          as: percentChange
+        }
+        # Calculate which symbol to show - up or down arrow, or a no-change dot
+        {
+          type: formula
+          expr: if(datum.up,'🡭',if(datum.down,'🡮','🡪'))
+          as: symbol
+        }
+      ]
+    }
+  ]
+  # Marks is a list of all drawing elements.
+  # For this graph we only need a single text mark.
+  marks: [
+    {
+      type: text
+      # Text mark executes once for each of the values in the results,
+      # but results has just one value in it. We could have also used it
+      # to draw a list of values.
+      from: {data: "results"}
+      encode: {
+        update: {
+          # Combine the symbol, last value, and the formatted percentage
+          # change into a string
+          text: {
+            signal: "datum.last"
+          }
+          # decide which color to use, depending on the value
+          # being up, down, or unchanged
+          fill: {
+            signal: if(datum.up, '#65a637', if(datum.down, '#d6563c', '#6db7c6'))
+          }
+          # positioning the text in the center of the window
+          align: {value: "right"}
+          baseline: {value: "middle"}
+          xc: {signal: "width/2"}
+          yc: {signal: "height/2"}
+          # Make the size of the font adjust with the size of the visualization
+          fontSize: {signal: "min(width/5, height)/1.3"}
+        }
+      }
+    },
+    {
+      type: text
+      # Text mark executes once for each of the values in the results,
+      # but results has just one value in it. We could have also used it
+      # to draw a list of values.
+      from: {data: "results"}
+      encode: {
+        update: {
+          # Combine the symbol, last value, and the formatted percentage
+          # change into a string
+          text: {
+            signal: "' ' + datum.symbol"
+          }
+          # decide which color to use, depending on the value
+          # being up, down, or unchanged
+          fill: {
+            value: '#000000'
+          }
+          # positioning the text in the center of the window
+          align: {value: "left"}
+          baseline: {value: "bottom"}
+          xc: {signal: "width/2"}
+          yc: {signal: "height/2"}
+          # Make the size of the font adjust with the size of the visualization
+          fontSize: {signal: "min(width/5, height)/3.3"}
+        }
+      }
+    },
+    {
+      type: text
+      # Text mark executes once for each of the values in the results,
+      # but results has just one value in it. We could have also used it
+      # to draw a list of values.
+      from: {data: "results"}
+      encode: {
+        update: {
+          # Combine the symbol, last value, and the formatted percentage
+          # change into a string
+          text: {
+            signal: "' ' + datum.prev + ' ('+ format(datum.percentChange, '+.1%') + ')'"
+          }
+          # decide which color to use, depending on the value
+          # being up, down, or unchanged
+          fill: {
+            value: '#000000'
+          }
+          # positioning the text in the center of the window
+          align: {value: "left"}
+          baseline: {value: "top"}
+          xc: {signal: "width/2"}
+          yc: {signal: "height/2"}
+          # Make the size of the font adjust with the size of the visualization
+          fontSize: {signal: "min(width/5, height)/3.3"}
+        }
+      }
+    }
+  ]
+}

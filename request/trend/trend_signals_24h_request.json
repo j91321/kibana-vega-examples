@@ -1,0 +1,30 @@
+GET .siem-signals-*/_search
+{
+  "aggs": {
+    "time_buckets": {
+      "date_histogram": {
+        "field": "@timestamp",
+        "fixed_interval": "1h",
+        "extended_bounds": {
+          "min": "now-48h/h",
+          "max": "now-1h/m"
+        }
+      }
+    }
+  },
+  "query": {
+    "bool": {
+      "must": [
+        {
+          "range": {
+            "@timestamp": {
+              "gte": "now-48h/h",
+              "lte": "now-1h/m"
+            }
+          }
+        }
+      ]
+    }
+  },
+  "size": 0
+}

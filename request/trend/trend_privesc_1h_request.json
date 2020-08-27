@@ -1,0 +1,37 @@
+GET winlogbeat-*/_search
+{
+  "aggs": {
+    "time_buckets": {
+      "date_histogram": {
+        "field": "@timestamp",
+        "fixed_interval": "1m",
+        "extended_bounds": {
+          "min": "now-121m/h",
+          "max": "now-1m/m"
+        }
+      }
+    }
+  },
+  "query": {
+    "bool": {
+      "must": [
+        {
+          "range": {
+            "@timestamp": {
+              "gte": "now-121m/m",
+              "lte": "now-1m/m"
+            }
+          }
+        }
+      ],
+      "filter": [
+        {
+          "term": {
+            "threat.tactic.id": "TA0004"
+          }
+        }
+      ]
+    }
+  },
+  "size": 0
+}

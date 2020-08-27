@@ -1,0 +1,58 @@
+{
+  "took" : 604,
+  "timed_out" : false,
+  "_shards" : {
+    "total" : 6,
+    "successful" : 6,
+    "skipped" : 0,
+    "failed" : 0
+  },
+  "hits" : {
+    "total" : {
+      "value" : 10000,
+      "relation" : "gte"
+    },
+    "max_score" : null,
+    "hits" : [ ]
+  },
+  "aggregations" : {
+    "tactics" : {
+      "doc_count_error_upper_bound" : 0,
+      "sum_other_doc_count" : 0,
+      "buckets" : [
+        {
+          "key" : "Persistence",
+          "doc_count" : 3962
+        },
+        {
+          "key" : "Lateral Movement",
+          "doc_count" : 5179
+        },
+        {
+          "key" : "Execution",
+          "doc_count" : 6381
+        },
+        {
+          "key" : "Defense Evasion",
+          "doc_count" : 6775
+        },
+        {
+          "key" : "Collection",
+          "doc_count" : 7320
+        },
+        {
+          "key" : "Credential Access",
+          "doc_count" : 4401
+        },
+        {
+          "key" : "Command and Control",
+          "doc_count" : 1081
+        },
+        {
+          "key" : "Discovery",
+          "doc_count" : 236
+        }
+      ]
+    }
+  }
+}
